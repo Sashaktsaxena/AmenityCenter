@@ -16,6 +16,10 @@ const GymPaymentPage = () => {
   const [month, setMonth] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // New state variables for height and weight
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
+
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -46,10 +50,10 @@ const GymPaymentPage = () => {
     }
 
     try {
-      // Sending only gymTime, monthPaid, and amount to the backend
+      // Sending gymTime, monthPaid, amount, height, and weight to the backend
       const response = await axios.post(
         'http://localhost:3002/gym/register',
-        { gymTime, monthPaid, amount: 300 },
+        { gymTime, monthPaid, amount: 300, height, weight },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setMessage(response.data.message);
@@ -151,6 +155,30 @@ const GymPaymentPage = () => {
               value={expiryDate}
               onChange={(e) => setExpiryDate(e.target.value)}
               placeholder="Expiry Date (MM/YY)"
+              className="gym-form-input"
+              required
+            />
+          </div>
+
+          {/* Height */}
+          <div className="gym-form-group">
+            <input
+              type="number"
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              placeholder="Height (in cm)"
+              className="gym-form-input"
+              required
+            />
+          </div>
+
+          {/* Weight */}
+          <div className="gym-form-group">
+            <input
+              type="number"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              placeholder="Weight (in kg)"
               className="gym-form-input"
               required
             />

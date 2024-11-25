@@ -94,6 +94,8 @@ import HomePage from './homepage';
 import FormMain from './rotate';
 import PaymentPage from './payment';
 import BillPage from './bill';
+import AdminAddMealPage from './trainer';
+import AddExcercise from './excercise';
 
 // Set Buffer and process globally
 window.Buffer = Buffer;
@@ -122,7 +124,8 @@ const App = () => {
         <Route path='/adreport' element={<AdminReportsPage/>} />
         <Route path="/payment/:itemId" element={<PaymentPage />} />
         <Route path="/bill" element={<BillPage />} />
-
+        <Route path="/trainer" element={<AdminAddMealPage/>}/>  
+        <Route path="/exer" element={<AddExcercise/>}/>
 
     
 

@@ -6,6 +6,8 @@ import bcrypt from "bcrypt"
 import jwt from 'jsonwebtoken'
 import multer from "multer";
 import axios from "axios";
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 const app=express();
 const port =3002;
 const corsOptions = {
@@ -20,7 +22,7 @@ const db=new pg.Client({
     user:"postgres",
     host:"localhost",
     database:"School",
-    password:"sashy1012@",
+    password:"",
     port:5432
 });
 db.connect();
@@ -49,6 +51,60 @@ app.use(express.static("public"));
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 //currently in use
+const otpStorage = {};
+// const transporter = nodemailer.createTransport({
+//   service: 'gmail', // You can use other services like Yahoo, Outlook, etc.
+//   auth: {
+//       user: 'codesphere1003@gmail.com', // Replace with your email
+//       pass: 'umln yddd vgsa zbit', // Replace with your email password or app password
+//   },
+// });
+
+// function sendOtpEmail(email, otp) {
+//   const mailOptions = {
+//       from: 'your-email@gmail.com',
+//       to: email,
+//       subject: 'Your Login OTP',
+//       text: `Your OTP for login is ${otp}. It is valid for 5 minutes.`,
+//   };
+
+//   return transporter.sendMail(mailOptions);
+// }
+// app.post('/send-otp', async (req, res) => {
+//   console.log ("hi ")
+//   const { email } = req.body;
+
+//   if (!email) {
+//       return res.status(400).send('Email is required');
+//   }
+
+//   const otp = crypto.randomInt(100000, 999999); // Generate a 6-digit OTP
+//   otpStorage[email] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 }; // Store OTP for 5 minutes
+
+//   try {
+//       await sendOtpEmail(email, otp);
+//       res.status(200).send('OTP sent successfully');
+//   } catch (error) {
+//       console.error('Error sending OTP:', error);
+//       res.status(500).send('Failed to send OTP');
+//   }
+// });
+
+// app.post('/verify-otp', (req, res) => {
+//   const { email, otp } = req.body;
+
+//   const storedOtp = otpStorage[email];
+//   if (!storedOtp) {
+//       return res.status(400).send('OTP not found or expired');
+//   }
+
+//   if (storedOtp.otp === parseInt(otp, 10) && Date.now() < storedOtp.expiresAt) {
+//       delete otpStorage[email]; // Remove OTP after successful verification
+//       res.status(200).send('OTP verified successfully');
+//   } else {
+//       res.status(400).send('Invalid or expired OTP');
+//   }
+// });
 app.post('/getinfo', upload.single('photo'), async (req, res) => {
   try {
       const { name, StudentId, Contact, Course, Password, secret } = req.body;
@@ -181,36 +237,112 @@ app.post('/getinfo', upload.single('photo'), async (req, res) => {
 }
 
   
-  app.post("/getlogin", async (req, res) => {
-    try {
-      const { Id, Passw } = req.body;
-      console.log("Received request with Id:", Id);
-      const result = await db.query("SELECT * FROM student WHERE st_id = $1", [Id]);
-  
-      if (result.rows.length === 0) {
-        console.log("User not found");
-        return res.status(401).json({ message: "User not a found" });
-        
-      } else {
-        const user = result.rows[0];
-        const passwordMatch = await bcrypt.compare(Passw, user.pass);
-  
-        if (!passwordMatch) {
-          console.log("Invalid credentials");
-          return res.status(401).json({ message: "Invalid credentials" });
-        }
+app.post("/getlogin", async (req, res) => {
+  try {
+    const { Id, Passw, email } = req.body;
+    console.log("Received request with Id:", Id);
 
-        else {
-          console.log("Login successful");
-          const token = jwt.sign({ userId: user.st_id, isAdmin: user.is_admin }, "littlecoder", { expiresIn: "1hr" });
-          res.status(200).json({ token, isAdmin: user.is_admin });
-        }
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      res.status(500).json({ message: "Internal server error" });
+    const result = await db.query("SELECT * FROM student WHERE st_id = $1", [Id]);
+
+    if (result.rows.length === 0) {
+      console.log("User not found");
+      return res.status(401).json({ message: "User not found" });
     }
-  });
+
+    const user = result.rows[0];
+    const passwordMatch = await bcrypt.compare(Passw, user.pass);
+
+    if (!passwordMatch) {
+      console.log("Invalid credentials");
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+
+
+    // Generate OTP
+    const otp = crypto.randomInt(100000, 999999);
+
+    // Send OTP via Nodemailer
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "",
+        pass: "",
+      },
+    });
+
+    const mailOptions = {
+      from: "your-email@gmail.com",
+      to: email,
+      subject: "Your OTP",
+      text: `Your OTP is: ${otp}`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    // Save OTP to memory or cache (e.g., Redis or in-memory map for demo purposes)
+    // You can use a database or more secure caching for production
+    const otpExpiry = Date.now() + 5 * 60 * 1000; // OTP valid for 5 minutes
+    otpStorage[Id] = { otp, expiry: otpExpiry };
+
+    console.log("Login successful, OTP sent");
+    res.status(200).json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.post("/verify-otp", async (req, res) => {
+  const { Id, otp } = req.body;
+
+  const storedOtp = otpStorage[Id];
+  if (!storedOtp) {
+    return res.status(400).json({ message: "OTP expired or not found" });
+  }
+
+  if (Date.now() > storedOtp.expiry) {
+    delete otpStorage[Id]; // Remove expired OTP
+    return res.status(400).json({ message: "OTP expired" });
+  }
+
+  if (parseInt(otp, 10) === storedOtp.otp) {
+    console.log("OTP verified successfully");
+
+    try {
+      // Fetch user details from the database using ID
+      const result = await db.query("SELECT * FROM student WHERE st_id = $1", [Id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "User not found during token generation" });
+      }
+
+      const user = result.rows[0];
+
+      // Check if the user is an admin
+      const isAdmin = user.is_admin;
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.st_id, isAdmin: isAdmin }, // Include user and isAdmin info
+        "littlecoder", // Secret key (you may want to store this securely)
+        { expiresIn: "1h" } // Token expiration
+      );
+
+      // Remove OTP after successful verification
+      delete otpStorage[Id]; 
+
+      // Return the token along with the admin status
+      return res.status(200).json({ message: "OTP verified successfully", token,isAdmin:isAdmin });
+    } catch (error) {
+      console.error("Error during token generation:", error);
+      return res.status(500).json({ message: "Error generating token" });
+    }
+  } else {
+    return res.status(400).json({ message: "Invalid OTP" });
+  }
+});
+
   // app.post('/dietplan', async (req, res) => {
   //   const { studentId, meals } = req.body;
   //   const trainerId = req.userId; // Assume an authentication middleware attaches the `user` object
@@ -822,15 +954,141 @@ app.patch('/change/:itemId', authenticateToken, async (req, res) => {
 //       res.status(500).json({ message: "Internal server error" });
 //   }
 // });
+app.post('/trainer_meals',authenticateToken, async (req, res) => {
+  console.log("hi")
+  const { userId, mealDescription, mealTime } = req.body;
+  const trainerId = req.userId; // Assuming `req.user.id` contains the logged-in trainer's ID
+
+  if (!userId || !mealDescription || !mealTime) {
+    return res.status(400).json({ message: 'Please provide all fields' });
+  }
+
+  try {
+    // Query to insert the meal into the trainer_diets table
+    const result = await db.query(
+      `INSERT INTO trainer_diets (user_id, trainer_id, diet_description, diet_time)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [userId, trainerId, mealDescription, mealTime]
+    );
+
+    // Return the newly added meal entry
+    res.status(201).json({ message: 'excercise added successfully', meal: result.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error adding meal' });
+  }
+});
+// Assuming you're using Express.js
+
+// Route to fetch all meals associated with a user
+app.get('/user_diets/:userId', authenticateToken,async (req, res) => {
+  console.log("hi")
+
+  const { userId } = req.params;
+
+  try {
+    const result = await db.query(
+      `SELECT * FROM trainer_diets WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send({ message: 'No diets found for this user' });
+    }
+
+    res.status(200).json(result.rows); // Return the list of diets
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: 'Error fetching diets' });
+  }
+});
+app.post('/trainer_ex',authenticateToken, async (req, res) => {
+  console.log("hi")
+  const { userId, mealDescription, mealTime } = req.body;
+  const trainerId = req.userId; // Assuming `req.user.id` contains the logged-in trainer's ID
+
+  if (!userId || !mealDescription || !mealTime) {
+    return res.status(400).json({ message: 'Please provide all fields' });
+  }
+
+  try {
+    // Query to insert the meal into the trainer_diets table
+    const result = await db.query(
+      `INSERT INTO trainer_exer(user_id, trainer_id, exer_description, exer_day)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [userId, trainerId, mealDescription, mealTime]
+    );
+
+    // Return the newly added meal entry
+    res.status(201).json({ message: 'excercise added successfully', meal: result.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error adding meal' });
+  }
+});
+// Assuming you're using Express.js
+
+// Route to fetch all meals associated with a user
+app.get('/user_exer/:userId', authenticateToken,async (req, res) => {
+  console.log("hi")
+
+  const { userId } = req.params;
+
+  try {
+    const result = await db.query(
+      `SELECT * FROM trainer_exer WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send({ message: 'No exercise found for this user' });
+    }
+
+    res.status(200).json(result.rows); // Return the list of diets
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: 'Error fetching diets' });
+  }
+});
+
+app.get('/user_info/:userId', async (req, res) => {
+  console.log("hi")
+  const { userId } = req.params; // Get userId from the URL params
+  
+  try {
+    // Query to get user info (height, weight from gym_memberships and user name from student)
+    const result = await db.query(
+      `SELECT s.name AS user_name, g.height, g.weight 
+       FROM gym_memberships g
+       JOIN student s ON s.st_id = g.user_id
+       WHERE g.user_id = $1`, 
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send({ message: 'User not found' });
+    }
+
+    // Return the user info
+    res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: 'Error fetching user data' });
+  }
+});
+
+
 app.post('/gym/register', authenticateToken, async (req, res) => {
   console.log("fjghs")
-  const { gymTime, monthPaid, amount } = req.body;
+  const { gymTime, monthPaid, amount ,height,weight} = req.body;
   const userId = req.userId;
   const currentDate = new Date();
   const currentDay = currentDate.getDate();
 
   // Only allow payment on or before the 10th day of the month
-  if (currentDay > 20) {
+  if (currentDay > 27) {
     return res.status(400).json({ message: "Gym fees can only be paid on or before the 10th of any month" });
   }
 
@@ -844,8 +1102,8 @@ app.post('/gym/register', authenticateToken, async (req, res) => {
     }
 
     // Insert new gym membership record
-    const insertQuery = 'INSERT INTO gym_memberships (user_id, month_paid, gym_time, amount) VALUES ($1, $2, $3, $4) RETURNING *';
-    const result = await db.query(insertQuery, [userId, monthPaid, gymTime, amount]);
+    const insertQuery = 'INSERT INTO gym_memberships (user_id, month_paid, gym_time, amount,height,weight) VALUES ($1, $2, $3, $4,$5,$6) RETURNING *';
+    const result = await db.query(insertQuery, [userId, monthPaid, gymTime, amount,height,weight]);
 
     res.status(200).json({ message: 'Gym registration and fee payment successful', membership: result.rows[0] });
   } catch (error) {

@@ -32,6 +32,9 @@ const GymWelcomePage = ({ membership }) => {
         <h2>Welcome to the Gym!</h2>
         <p>Gym Time: {membership.gym_time}</p>
         <p>Month Paid: {membership.month_paid}</p>
+        <p>Enter Your Height in cm :{membership.height}</p>
+        <p>Enter Your Weight in kg :{membership.weight}</p>
+
 
         <div>
           <h1>Receipts</h1>

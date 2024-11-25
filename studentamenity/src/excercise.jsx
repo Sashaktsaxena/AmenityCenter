@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const AdminAddMealPage = () => {
+const AddExcercise = () => {
   const [userId, setUserId] = useState('');
   const [mealDescription, setMealDescription] = useState('');
   const [mealTime, setMealTime] = useState('');
@@ -37,11 +37,12 @@ const AdminAddMealPage = () => {
     }
 
     try {
-      const response = await axios.get(`http://localhost:3002/user_diets/${userId}`, {
+      const response = await axios.get(`http://localhost:3002/user_exer/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      console.log(response.data)
       setUserDiets(response.data); // Set the user diets
     } catch (error) {
       setMessage('Failed to fetch user diets');
@@ -65,7 +66,7 @@ const AdminAddMealPage = () => {
     try {
       // Sending the meal data to the backend with Bearer token for authentication
       const response = await axios.post(
-        'http://localhost:3002/trainer_meals',
+        'http://localhost:3002/trainer_ex',
         {
           userId,
           mealDescription,
@@ -91,7 +92,7 @@ const AdminAddMealPage = () => {
 
   return (
     <div>
-      <h1>Add Meal for User</h1>
+      <h1>Add Excercise for User</h1>
 
       {/* Input for searching user */}
       <input
@@ -113,39 +114,44 @@ const AdminAddMealPage = () => {
 
       {/* Form for adding meal */}
       <textarea
-        placeholder="Enter meal description"
+        placeholder="Enter Excercise description"
         value={mealDescription}
         onChange={(e) => setMealDescription(e.target.value)}
       />
       <select onChange={(e) => setMealTime(e.target.value)} value={mealTime}>
-        <option value="">Select Meal Time</option>
-        <option value="Morning">Morning</option>
-        <option value="Afternoon">Afternoon</option>
-        <option value="Evening">Evening</option>
+        <option value="">Select Day</option>
+        <option value="Morning">Monday</option>
+        <option value="Tuesday">Tuesday</option>
+        <option value="Wednesday">Wednesday</option>
+        <option value="Thursday">Thursday</option>
+        <option value="Friday">Friday</option>
+        <option value="Saturday">Saturday</option>
+        
+        <option value="Sunday">Sunday</option>
       </select>
-      <button onClick={handleAddMeal}>Add Meal</button>
+      <button onClick={handleAddMeal}>Add Excercise</button>
 
       {message && <p>{message}</p>}
 
       {/* Display the newly added meal */}
       {addedMeal && (
         <div>
-          <h3>Added Meal:</h3>
-          <p><strong>Meal Description:</strong> {addedMeal.diet_description}</p>
-          <p><strong>Meal Time:</strong> {addedMeal.diet_time}</p>
-          <p><strong>Added by Trainer ID:</strong> {addedMeal.trainer_id}</p>
+          <h3>Added Excercise:</h3>
+          <p><strong>Excercise Description:</strong> {addedMeal.diet_description}</p>
+          <p><strong>Excersise Day:</strong> {addedMeal.diet_time}</p>
+          <p><strong>Trainer ID:</strong> {addedMeal.trainer_id}</p>
           <p><strong>User ID:</strong> {addedMeal.user_id}</p>
         </div>
       )}
 
       {/* Display all meals associated with the user */}
-      <h3>User's Diets:</h3>
+      <h3>User's Excercise:</h3>
 <ul>
   {userDiets.map((meal, index) => (
     <li key={index}>
       <p>
-        <strong>Meal Description:</strong> {meal.diet_description} | 
-        <strong> Meal Time:</strong> {meal.diet_time} | 
+        <strong>Excercise Description:</strong> {meal.exer_description} | 
+        <strong> Excercise Day:</strong> {meal.exer_day} | 
         <strong> Trainer ID:</strong> {meal.trainer_id} | 
         <strong> User ID:</strong> {meal.user_id}
       </p>
@@ -156,4 +162,4 @@ const AdminAddMealPage = () => {
   );
 };
 
-export default AdminAddMealPage;
+export default AddExcercise;
